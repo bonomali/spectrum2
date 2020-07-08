@@ -428,11 +428,14 @@ class SpectrumNetworkPlugin : public NetworkPlugin {
 				adminLegacyName = "steam-mobile";
 				adminAlias = "steam-mobile";
 			}
-            else if (protocol == "prpl-eionrobb-discord") {
-                adminLegacyName = "discord";
-                adminAlias = "discord";
-            }
-
+			else if (protocol == "prpl-eionrobb-discord") {
+				adminLegacyName = "discord";
+				adminAlias = "discord";
+			}
+			else if (protocol == "telegram-tdlib") {
+				adminLegacyName = "telegram";
+				adminAlias = "telegram";
+			}
 			if (!purple_find_prpl_wrapped(protocol.c_str())) {
 				LOG4CXX_INFO(logger,  name.c_str() << ": Invalid protocol '" << protocol << "'");
 				np->handleDisconnected(user, 1, "Invalid protocol " + protocol);
@@ -1846,17 +1849,28 @@ void * requestInput(const char *title, const char *primary,const char *secondary
 			np->m_inputRequests[req->mainJID] = req;
 			return NULL;
 		}
-        else if (primaryString == "Enter Discord auth code") {
-            LOG4CXX_INFO(logger, "prpl-discord 2FA request");
-            np->handleMessage(np->m_accounts[account], np->adminLegacyName, std::string("2FA code: "));
-            inputRequest *req = new inputRequest;
-            req->ok_cb = (PurpleRequestInputCb)ok_cb;
-            req->user_data = user_data;
-            req->account = account;
-            req->mainJID = np->m_accounts[account];
-            np->m_inputRequests[req->mainJID] = req;
-            return NULL;
-        }
+		else if (primaryString == "Enter Discord auth code") {
+			LOG4CXX_INFO(logger, "prpl-discord 2FA request");
+			np->handleMessage(np->m_accounts[account], np->adminLegacyName, std::string("2FA code: "));
+			inputRequest *req = new inputRequest;
+			req->ok_cb = (PurpleRequestInputCb)ok_cb;
+			req->user_data = user_data;
+			req->account = account;
+			req->mainJID = np->m_accounts[account];
+			np->m_inputRequests[req->mainJID] = req;
+			return NULL;
+		}
+		else if (boost::starts_with(primaryString, "Enter authentication code")) {
+			LOG4CXX_INFO(logger, "telegram-tdlib 2FA request");
+			np->handleMessage(np->m_accounts[account], np->adminLegacyName, std::string("Authentication code: "));
+			inputRequest *req = new inputRequest;
+			req->ok_cb = (PurpleRequestInputCb)ok_cb;
+			req->user_data = user_data;
+			req->account = account;
+			req->mainJID = np->m_accounts[account];
+			np->m_inputRequests[req->mainJID] = req;
+			return NULL;
+		}
 		else {
 			LOG4CXX_WARN(logger, "Unhandled request input. primary=" << primaryString);
 		}
