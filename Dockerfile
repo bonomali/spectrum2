@@ -47,7 +47,8 @@ RUN /bin/bash ./build_spectrum2.sh
 
 RUN apt-get install --no-install-recommends -y libjson-glib-dev \
 		graphicsmagick-imagemagick-compat libsecret-1-dev libnss3-dev \
-		libwebp-dev libgcrypt20-dev libpng-dev
+		libwebp-dev libgcrypt20-dev libpng-dev libglib2.0-dev \
+		libprotobuf-c-dev protobuf-c-compiler
 
 RUN echo "---> Installing purple-instagram" && \
 		git clone https://github.com/EionRobb/purple-instagram.git && \
@@ -64,12 +65,6 @@ RUN echo "---> Installing icyque" && \
 RUN echo "---> Installing skype4pidgin" && \
 		git clone git://github.com/EionRobb/skype4pidgin.git && \
 		cd skype4pidgin/skypeweb && \
-		make && \
-		make DESTDIR=/tmp/out install
-
-RUN echo "---> Install Discord" && \
-		git clone https://github.com/EionRobb/purple-discord.git && \
-		cd purple-discord && \
 		make && \
 		make DESTDIR=/tmp/out install
 
@@ -93,6 +88,12 @@ git clone --recursive https://github.com/majn/telegram-purple && \
 		make && \
 		make DESTDIR=/tmp/out install
 		
+RUN echo "---> purple-battlenet" && \
+git clone --recursive https://github.com/EionRobb/purple-battlenet && \
+		cd purple-battlenet && \
+		make && \
+		make DESTDIR=/tmp/out install		
+		
 FROM debian:10.4-slim as production
 
 EXPOSE 5222
@@ -101,6 +102,7 @@ VOLUME ["/etc/spectrum2/transports", "/var/lib/spectrum2"]
 ARG DEBIAN_FRONTEND=noninteractive
 ARG APT_LISTCHANGES_FRONTEND=none
 
+RUN echo 'deb http://deb.debian.org/debian stable-backports main' > /etc/apt/sources.list.d/backports.list
 RUN apt-get update -qq
 RUN apt-get install --no-install-recommends -y curl ca-certificates gnupg1
 
@@ -116,7 +118,8 @@ RUN echo "---> Installing purple-facebook" && \
 		apt-get install --no-install-recommends -y purple-facebook
 RUN echo "---> Installing purple-telegram" && \
 		apt-get install --no-install-recommends -y libpurple-telegram-tdlib libtdjson1.6.0
-
+RUN echo "---> Installing purple-discord" && \
+                apt-get install --no-install-recommends -y -t buster-backports purple-discord
 
 COPY --from=staging /tmp/out/* /usr/
 
