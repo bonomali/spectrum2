@@ -3,7 +3,7 @@ name: CI
 on: [push, pull_request]
 
 jobs:
-  linux:
+  linux-glibc:
     runs-on: ubuntu-latest
 
     steps:
@@ -15,7 +15,30 @@ jobs:
         DOCKER_BUILDKIT: 1
     - name: Run tests
       run: docker run -tt spectrum:tests
+  linux-clang:
+    runs-on: ubuntu-latest
 
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Build tests
+      run: docker build . --target test-clang -t spectrum:tests-clang
+      env:
+        DOCKER_BUILDKIT: 1
+    - name: Run tests
+      run: docker run -tt spectrum:tests-clang
+  linux-musl:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Build tests
+      env:
+        DOCKER_BUILDKIT: 1
+      run: docker build . --target test-musl -t spectrum:tests-musl
+    - name: Run tests
+      run: docker run -tt --env LANG=en_US.UTF-8 spectrum:tests-musl
   macos:
     runs-on: macOS-latest
     steps:
@@ -47,7 +70,7 @@ jobs:
       run: |
         set CMAKE_PREFIX_PATH=%cd%\deps32
         set PATH=%PATH%;%cd%\deps32\bin
-        cmake -G "Visual Studio 16 2019" -A Win32 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_TESTS=ON -DENABLE_FROTZ=OFF -DENABLE_PURPLE=OFF -DENABLE_MYSQL=OFF -DCMAKE_INSTALL_PREFIX=dist .
+        cmake -G "Visual Studio 16 2019" -A Win32 -DCMAKE_BUILD_TYPE=RelWithDebInfo -DENABLE_TESTS=ON -DENABLE_FROTZ=OFF -DENABLE_PURPLE=OFF -DENABLE_MYSQL=OFF -DENABLE_IRC=OFF -DENABLE_PQXX=OFF -DCMAKE_INSTALL_PREFIX=dist .
       shell: cmd
     - name: Build solution
       run:  msbuild /t:Build INSTALL.vcxproj /p:Configuration=RelWithDebInfo /p:Platform=Win32

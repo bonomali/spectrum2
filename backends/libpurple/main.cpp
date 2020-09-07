@@ -18,7 +18,6 @@
 #include "transport/Config.h"
 #include "transport/StorageBackend.h"
 #include "geventloop.h"
-#include "Swiften/SwiftenCompat.h"
 
 // #include "valgrind/memcheck.h"
 #if !defined(__FreeBSD__) && !defined(__APPLE__)
@@ -90,7 +89,7 @@ static void transportDataReceived(gpointer data, gint source, PurpleInputConditi
 
 class SpectrumNetworkPlugin;
 
-SWIFTEN_SHRPTR_NAMESPACE::shared_ptr<Config> config;
+std::shared_ptr<Config> config;
 SpectrumNetworkPlugin *np;
 StorageBackend *storagebackend;
 
@@ -145,6 +144,7 @@ class AuthRequestList : public std::map<std::string, authRequest*> {
 			LOG4CXX_TRACE(logger, "AuthRequestList::accept(" << user << ", " << buddyName << ")");
 			it->second->authorize_cb(it->second->user_data);
 			this->erase(user + buddyName);
+			return true;
 		}
 		
 
@@ -158,6 +158,7 @@ class AuthRequestList : public std::map<std::string, authRequest*> {
 			LOG4CXX_TRACE(logger, "AuthRequestList::deny(" << user << ", " << buddyName << ")");
 			it->second->deny_cb(it->second->user_data);
 			this->erase(user + buddyName);
+			return true;
 		}
 };
 
@@ -531,7 +532,7 @@ class SpectrumNetworkPlugin : public NetworkPlugin {
 				purple_account_set_enabled_wrapped(account, "spectrum", FALSE);
 
 #ifndef WIN32
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if !defined(__FreeBSD__) && !defined(__APPLE__) && defined (__GLIBC__)
 				malloc_trim(0);
 #endif
 #endif
@@ -2364,7 +2365,7 @@ static void signed_on(PurpleConnection *gc, gpointer unused) {
 	PurpleAccount *account = purple_connection_get_account_wrapped(gc);
 	np->handleConnected(np->m_accounts[account]);
 #ifndef WIN32
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if !defined(__FreeBSD__) && !defined(__APPLE__) && defined (__GLIBC__)
 	// force returning of memory chunks allocated by libxml2 to kernel
 	malloc_trim(0);
 #endif
@@ -2570,9 +2571,11 @@ static void transportDataReceived(gpointer data, gint source, PurpleInputConditi
 			else {
 				PurplePlugin *plugin = purple_find_prpl_wrapped(CONFIG_STRING(config, "service.protocol").c_str());
 				PurplePluginProtocolInfo *prpl_info = PURPLE_PLUGIN_PROTOCOL_INFO(plugin);
-				bool isPasswordlessPlugin = prpl_info->options & OPT_PROTO_NO_PASSWORD;
-				LOG4CXX_INFO(logger, "passwordless backend: " << isPasswordlessPlugin);
-				cfg.setNeedPassword(!isPasswordlessPlugin);
+				if (prpl_info) {
+					bool isPasswordlessPlugin = prpl_info->options & OPT_PROTO_NO_PASSWORD;
+					LOG4CXX_INFO(logger, "passwordless backend: " << isPasswordlessPlugin);
+					cfg.setNeedPassword(!isPasswordlessPlugin);
+				}
 				cfg.setNeedRegistration(true);
 			}
 			np->sendConfig(cfg);
@@ -2593,7 +2596,7 @@ int main(int argc, char **argv) {
 	boost::locale::generator gen;
 	std::locale::global(gen(""));
 #ifndef WIN32
-#if !defined(__FreeBSD__) && !defined(__APPLE__)
+#if !defined(__FreeBSD__) && !defined(__APPLE__) && defined (__GLIBC__)
 		mallopt(M_CHECK_ACTION, 2);
 		mallopt(M_PERTURB, 0xb);
 #endif
@@ -2613,7 +2616,7 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 
-	config = SWIFTEN_SHRPTR_NAMESPACE::shared_ptr<Config>(cfg);
+	config = std::shared_ptr<Config>(cfg);
 
 	Logging::initBackendLogging(config.get());
 	if (CONFIG_STRING(config, "service.protocol") == "prpl-hangouts" || CONFIG_STRING(config, "service.protocol") == "prpl-steam-mobile" || CONFIG_STRING(config, "service.protocol") == "prpl-skypeweb" || CONFIG_STRING(config, "service.protocol") == "prpl-eionrobb-discord") {

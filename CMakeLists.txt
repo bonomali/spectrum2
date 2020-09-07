@@ -1,10 +1,10 @@
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 3.7)
 
 project(libtransport)
 
-if(${CMAKE_MAJOR_VERSION} GREATER 2)
-	cmake_policy(SET CMP0037 OLD)
-endif()
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CPack)
 message(STATUS "Variables to override default places where to find libraries:")
@@ -17,11 +17,11 @@ message(STATUS "  |-libxml :                         -DLIBXML_LIBRARY")
 message(STATUS "|- boost   : -DBOOST_INCLUDEDIR,     -DBOOST_LIBRARYDIR")
 message(STATUS "|- protobuf: -DPROTOBUF_INCLUDE_DIR, -DPROTOBUF_LIBRARY")
 message(STATUS "           : -DPROTOBUF_PROTOC_EXECUTABLE")
-message(STATUS "|- log4cxx : -DLOG4CXX_INCLUDE_DIR,  -DLOG4CXX_LIBRARY")
+message(STATUS "|- log4cxx : -DLOG4CXX_INCLUDE_DIR,  -DLOG4CXX_LIBRARIES")
 message(STATUS "|- purple  : -DPURPLE_INCLUDE_DIR,   -DPURPLE_LIBRARY")
 message(STATUS "           : -DPURPLE_NOT_RUNTIME - enables compilation with libpurple.lib")
-
-option(ENABLE_QT4 "Build with Qt4 instead of Qt5" ON)
+message(STATUS "|- pgxx    : -DPQXX_INCLUDE_DIR,     -DPQXX_LIBRARY")
+message(STATUS "|- irc     : -DIRC_INCLUDE_DIR,      -DIRC_LIBRARY")
 
 option(ENABLE_SQLITE3 "Build with SQLite3 support" ON)
 option(ENABLE_MYSQL "Build with MySQL support" ON)
@@ -78,8 +78,7 @@ if(NOT SWIFTEN_FOUND)
 	set(SWIFTEN_LIBRARY ${SWIFTEN_LIBRARY} "Secur32")
 	set(SWIFTEN_LIBRARY ${SWIFTEN_LIBRARY} "Iphlpapi")
 	set(SWIFTEN_LIBRARY ${SWIFTEN_LIBRARY} "Winscard")
-	message(STATUS "Using swiften: ${SWIFTEN_INCLUDE_DIR} ${SWIFTEN_LIBRARY}
-	Version: ${SWIFTEN_VERSION}")
+	message(STATUS "Using swiften: ${SWIFTEN_INCLUDE_DIR} ${SWIFTEN_LIBRARY}")
 endif()
 
 # FIND BOOST
@@ -93,11 +92,7 @@ if(WIN32)
 endif(WIN32)
 
 set(Boost_FIND_QUIETLY ON)
-if("${SWIFTEN_VERSION}" STRGREATER "4")
-	find_package(Boost COMPONENTS program_options date_time system filesystem regex thread locale REQUIRED)
-else()
-  find_package(Boost COMPONENTS program_options date_time system filesystem regex thread signals locale REQUIRED)
-endif()
+find_package(Boost COMPONENTS program_options date_time system filesystem regex thread locale REQUIRED)
 
 message( STATUS "Found Boost: ${Boost_VERSION}, ${Boost_LIBRARIES}, ${Boost_INCLUDE_DIR}")
 
@@ -150,18 +145,14 @@ endif()
 
 # FIND GLIB
 if(ENABLE_PURPLE)
-#	if(GLIB2_INCLUDE_DIR AND GLIB2_LIBRARIES)
-#		set(GLIB2_FOUND TRUE)
-#	else()
-		find_package(glib)
-#	endif()
+		find_package(GLIB2)
 endif()
 
 # FIND LIBXML2
 # find_package(libxml2)
 
 # FIND PROTOBUF
-find_package(Protobuf REQUIRED)
+find_package(PROTOBUF REQUIRED)
 
 if(NOT PROTOBUF_FOUND AND PROTOBUF_INCLUDE_DIR AND PROTOBUF_LIBRARY)
 	set(PROTOBUF_FOUND 1)
@@ -173,7 +164,7 @@ if(NOT PROTOBUF_FOUND AND PROTOBUF_INCLUDE_DIR AND PROTOBUF_LIBRARY)
 	message(STATUS "Using protobuf: ${PROTOBUF_INCLUDE_DIRS} ${PROTOBUF_LIBRARY}")
 endif()
 
-find_package(jsoncpp REQUIRED)
+find_package(JsonCpp REQUIRED)
 if(JSONCPP_FOUND)
 	include_directories(${JSONCPP_INCLUDE_DIRS})
 	message(STATUS "Found jsoncpp: ${JSONCPP_INCLUDE_DIRS} ${JSONCPP_LIBRARY}, shared: ${JSONCPP_LIBRARY_IS_SHARED}")
@@ -192,19 +183,11 @@ if(CMAKE_COMPILER_IS_GNUCXX)
 	find_package(openssl)
 endif()
 
+add_definitions(-DSUPPORT_LEGACY_CAPS)
+
 if(ENABLE_IRC)
 	find_package(Communi)
-
-	if(ENABLE_QT4)
-		include(FindQt4)
-		find_package(Qt4 COMPONENTS QtCore QtNetwork)
-	else()
 	find_package(Qt5 COMPONENTS Core Network)
-	endif()
-
-	# add_definitions(${SWIFTEN_CFLAGS})
-	add_definitions(-DSUPPORT_LEGACY_CAPS)
-	# add_definitions(-DBOOST_FILESYSTEM_VERSION=2)
 endif()
 
 find_package(event)
@@ -215,20 +198,12 @@ if(ENABLE_DOCS)
 	find_package(Doxygen)
 endif()
 
-# if(ENABLE_LOG)
-	if(LOG4CXX_INCLUDE_DIR AND LOG4CXX_LIBRARY)
-		set(LOG4CXX_LIBRARIES ${LOG4CXX_LIBRARY})
-		set(LOG4CXX_FOUND 1)
-		message(STATUS "Using log4cxx: ${CPPUNIT_INCLUDE_DIR} ${LOG4CXX_INCLUDE_DIR}")
-	else()
-		set(log4cxx_DIR "${CMAKE_SOURCE_DIR}/cmake_modules")
-		find_package(log4cxx)
-	endif()
-# endif()
+set(log4cxx_DIR "${CMAKE_SOURCE_DIR}/cmake_modules")
+find_package(log4cxx)
 
 # FIND CPPUNIT
 if(ENABLE_TESTS)
-	find_package(cppunit)
+	find_package(CppUnit)
 
 	if(NOT CPPUNIT_FOUND AND CPPUNIT_INCLUDE_DIR AND CPPUNIT_LIBRARY)
 		set(CCPUNIT_LIBRARIES ${CPPUNIT_LIBRARY})
@@ -338,10 +313,6 @@ if(PROTOBUF_FOUND)
 		message("IRC plugin        : yes")
 		include_directories(${QT_QTNETWORK_INCLUDE_DIR})
 		include_directories(${IRC_INCLUDE_DIR})
-	
-		if(ENABLE_QT4)
-			include(${QT_USE_FILE})
-		endif()
 	else()
 		if(ENABLE_IRC)
 			message("IRC plugin        : no (install libCommuni and libprotobuf-dev)")

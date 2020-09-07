@@ -28,14 +28,39 @@ ARG APT_LISTCHANGES_FRONTEND=none
 
 WORKDIR spectrum2
 
-RUN apt-get install --no-install-recommends -y prosody ngircd python3-sleekxmpp python3-dateutil python3-dnspython libcppunit-dev libpurple-xmpp-carbons1 libglib2.0-dev
+RUN apt-get install --no-install-recommends -y prosody ngircd python3-sleekxmpp python3-dateutil python3-dnspython libcppunit-dev libpurple-xmpp-carbons1 libglib2.0-dev psmisc
 
-
-RUN cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_TESTS=ON -DENABLE_QT4=OFF -DENABLE_FROTZ=OFF -DCMAKE_UNITY_BUILD=ON . && make
-
-RUN apt-get install --no-install-recommends -y psmisc
+RUN cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_TESTS=ON -DENABLE_QT4=OFF -DENABLE_FROTZ=OFF -DCMAKE_UNITY_BUILD=ON . && make -j4
 
 ENTRYPOINT ["make", "extended_test"]
+
+FROM base as test-clang
+
+ARG DEBIAN_FRONTEND=noninteractive
+ARG APT_LISTCHANGES_FRONTEND=none
+
+RUN curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+
+RUN echo 'deb http://apt.llvm.org/buster/ llvm-toolchain-buster-10 main' > /etc/apt/sources.list.d/llvm.list
+RUN apt-get update -qq
+
+RUN apt-get install --no-install-recommends -y libcppunit-dev clang-10 lld-10
+
+WORKDIR spectrum2
+
+RUN cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_TESTS=ON -DENABLE_QT4=OFF -DENABLE_FROTZ=OFF -DCMAKE_UNITY_BUILD=ON -DCMAKE_C_COMPILER=/usr/bin/clang-10 -DCMAKE_CXX_COMPILER=/usr/bin/clang++-10 -DCMAKE_EXE_LINKER_FLAGS=-fuse-ld=lld -DCMAKE_SHARED_LINKER_FLAGS=-fuse-ld=lld . && make -j4
+
+ENTRYPOINT ["make", "test"]
+
+FROM spectrum2/alpine-build-environment:latest as test-musl
+
+COPY . spectrum2/
+
+WORKDIR spectrum2
+
+RUN cmake -DCMAKE_BUILD_TYPE=Debug -DENABLE_TESTS=ON -DENABLE_QT4=OFF -DENABLE_FROTZ=OFF -DCMAKE_UNITY_BUILD=ON . && make -j4
+
+ENTRYPOINT ["make", "test"]
 
 FROM base as staging
 
@@ -49,7 +74,7 @@ RUN /bin/bash ./build_spectrum2.sh
 RUN apt-get install --no-install-recommends -y libjson-glib-dev \
 		graphicsmagick-imagemagick-compat libsecret-1-dev libnss3-dev \
 		libwebp-dev libgcrypt20-dev libpng-dev libglib2.0-dev \
-		libprotobuf-c-dev protobuf-c-compiler
+		libprotobuf-c-dev protobuf-c-compiler libmarkdown2-dev
 
 RUN echo "---> Installing purple-instagram" && \
 		git clone https://github.com/EionRobb/purple-instagram.git && \
@@ -88,14 +113,27 @@ git clone --recursive https://github.com/majn/telegram-purple && \
 		./configure && \
 		make && \
 		make DESTDIR=/tmp/out install
-		
+
 RUN echo "---> purple-battlenet" && \
 git clone --recursive https://github.com/EionRobb/purple-battlenet && \
 		cd purple-battlenet && \
 		make && \
-		make DESTDIR=/tmp/out install		
+		make DESTDIR=/tmp/out install
+
+RUN echo "---> purple-hangouts" && \
+git clone --recursive https://github.com/EionRobb/purple-hangouts && \
+		cd purple-hangouts && \
+		make && \
+		make DESTDIR=/tmp/out install
+
+RUN echo "---> purple-mattermost" && \
+git clone --recursive https://github.com/EionRobb/purple-mattermost && \
+		cd purple-mattermost && \
+		make && \
+		make DESTDIR=/tmp/out install
+
 		
-FROM debian:10.4-slim as production
+FROM debian:buster-slim as production
 
 EXPOSE 8080
 VOLUME ["/etc/spectrum2/transports", "/var/lib/spectrum2"]
@@ -105,7 +143,7 @@ ARG APT_LISTCHANGES_FRONTEND=none
 
 RUN echo 'deb http://deb.debian.org/debian stable-backports main' > /etc/apt/sources.list.d/backports.list
 RUN apt-get update -qq
-RUN apt-get install --no-install-recommends -y curl ca-certificates gnupg1
+RUN apt-get install --no-install-recommends -y curl ca-certificates gnupg1 libmarkdown2
 
 RUN echo "deb https://packages.spectrum.im/spectrum2/ buster main" | tee -a /etc/apt/sources.list
 RUN curl -fsSL https://packages.spectrum.im/packages.key | apt-key add -
@@ -115,6 +153,8 @@ RUN echo "deb http://download.opensuse.org/repositories/home:/ars3n1y/Debian_10/
 RUN curl -fsSL https://download.opensuse.org/repositories/home:ars3n1y/Debian_10/Release.key | apt-key add
 RUN apt-get update -qq
 
+RUN echo "---> Installing pidgin-sipe" && \
+		apt-get install --no-install-recommends -y pidgin-sipe
 RUN echo "---> Installing purple-facebook" && \
 		apt-get install --no-install-recommends -y purple-facebook
 RUN echo "---> Installing purple-telegram" && \
