@@ -13,13 +13,22 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-
-    - uses: docker/build-push-action@v1
-      env:
-        DOCKER_BUILDKIT: 1
+    - name: Set up QEMU
+      uses: docker/setup-qemu-action@v1
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+    - name: Login to DockerHub
+      uses: docker/login-action@v1 
       with:
         username: ${{ secrets.DOCKERHUB_LOGIN }}
-        password: ${{ secrets.DOCKERHUB }}
-        repository: spectrum2/spectrum
-        tag_with_ref: true
+        password: ${{ secrets.DOCKERHUB}}
+    - name: Build and push
+      uses: docker/build-push-action@v2
+      with:
+        context: .
+        file: ./Dockerfile
+        platforms: linux/amd64,linux/arm64        
         target: production
+        cache-from: type=registry,ref=spectrum2/spectrum
+        cache-to: type=registry,ref=spectrum2/spectrum
+        tags: spectrum2/spectrum:latest
